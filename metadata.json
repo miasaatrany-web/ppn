@@ -1,0 +1,6 @@
+{
+  "name": "Gestion Stock PPN",
+  "description": "Une application moderne pour la gestion des stocks de produits de première nécessité (PPN) avec suivi des arrivées et sorties.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

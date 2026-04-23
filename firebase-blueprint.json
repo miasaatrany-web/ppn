@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "products": {
+      "title": "Produits",
+      "description": "Liste des produits gérés",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "unit": { "type": "string" },
+        "initialStock": { "type": "number" }
+      },
+      "required": ["id", "name", "unit"]
+    },
+    "transactions": {
+      "title": "Transactions",
+      "description": "Journal des flux de stock",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "type": { "type": "string", "enum": ["IN", "OUT"] },
+        "quantity": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "runningStock": { "type": "number" }
+      },
+      "required": ["id", "productId", "type", "quantity", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "products",
+      "description": "Collection des produits"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "transactions",
+      "description": "Journal des transactions"
+    }
+  }
+}
