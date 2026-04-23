@@ -24,7 +24,9 @@ import {
   Menu,
   Lock,
   User,
-  LogIn
+  LogIn,
+  Printer,
+  ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Product, Transaction, InventoryItem, TransactionType } from './types';
@@ -62,6 +64,10 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'day' | 'week' | 'month' | 'custom'>('all');
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
+  const [historyStartDate, setHistoryStartDate] = useState('');
+  const [historyEndDate, setHistoryEndDate] = useState('');
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'history' | 'setup'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
@@ -122,6 +128,65 @@ export default function App() {
       };
     });
   }, [products, transactions]);
+
+  const filteredTransactions = useMemo(() => {
+    let filtered = transactions;
+
+    // Filter by product name
+    if (historySearchTerm) {
+      filtered = filtered.filter(t => {
+        const prod = products.find(p => p.id === t.productId);
+        return prod?.name.toLowerCase().includes(historySearchTerm.toLowerCase());
+      });
+    }
+
+    // Filter by date
+    if (historyFilter === 'all') return filtered;
+    
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    return filtered.filter(t => {
+      const tDate = new Date(t.timestamp);
+      if (historyFilter === 'day') {
+        return tDate >= today;
+      }
+      if (historyFilter === 'week') {
+        const weekAgo = new Date(now);
+        weekAgo.setDate(now.getDate() - 7);
+        return tDate >= weekAgo;
+      }
+      if (historyFilter === 'month') {
+        const monthAgo = new Date(now);
+        monthAgo.setMonth(now.getMonth() - 1);
+        return tDate >= monthAgo;
+      }
+      if (historyFilter === 'custom') {
+        if (!historyStartDate && !historyEndDate) return true;
+        const start = historyStartDate ? new Date(historyStartDate) : new Date(0);
+        const end = historyEndDate ? new Date(historyEndDate) : new Date();
+        // Set end to end of day
+        end.setHours(23, 59, 59, 999);
+        return tDate >= start && tDate <= end;
+      }
+      return true;
+    });
+  }, [transactions, historyFilter, historySearchTerm, historyStartDate, historyEndDate, products]);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const transactionsByProduct = useMemo(() => {
+    const groups: Record<string, Transaction[]> = {};
+    filteredTransactions.forEach(t => {
+      const prod = products.find(p => p.id === t.productId);
+      const prodName = prod?.name || 'Inconnu';
+      if (!groups[prodName]) groups[prodName] = [];
+      groups[prodName].push(t);
+    });
+    return groups;
+  }, [filteredTransactions, products]);
 
   const addTransaction = async (productId: string, type: TransactionType, quantity: number, currentStock: number) => {
     if (quantity <= 0) return;
@@ -199,7 +264,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-slate-50 font-sans text-slate-900 overflow-hidden relative">
+    <div className="flex h-screen w-full bg-slate-50 font-sans text-slate-900 overflow-hidden relative print:hidden">
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 w-full h-16 bg-slate-900 z-50 flex items-center justify-between px-6 shadow-xl border-b border-white/5">
          <h1 className="text-xl font-bold tracking-tight text-blue-400">
@@ -467,9 +532,71 @@ export default function App() {
               className="flex flex-col h-full overflow-hidden"
             >
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
-                <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between">
-                  <h2 className="font-black text-[10px] md:text-sm uppercase text-slate-800 tracking-widest">Mouvements & Temps Réel</h2>
+                <div className="p-4 md:p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <h2 className="font-black text-[10px] md:text-sm uppercase text-slate-800 tracking-widest shrink-0">Mouvements & Temps Réel</h2>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative flex-1 md:w-48 min-w-[150px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                      <input 
+                        type="text" 
+                        placeholder="Chercher produit..." 
+                        value={historySearchTerm}
+                        onChange={(e) => setHistorySearchTerm(e.target.value)}
+                        className="w-full pl-8 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[9px] font-bold outline-none focus:border-blue-500/20 transition-all placeholder:text-slate-300"
+                      />
+                    </div>
+                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                      {(['all', 'day', 'week', 'month', 'custom'] as const).map(f => (
+                        <button
+                          key={f}
+                          onClick={() => setHistoryFilter(f)}
+                          className={`px-2 py-1 text-[8px] font-black uppercase rounded-md transition-all ${
+                            historyFilter === f ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                          }`}
+                        >
+                          {f === 'all' ? 'Tout' : f === 'day' ? 'Jour' : f === 'week' ? 'Semaine' : f === 'month' ? 'Mois' : 'Calendrier'}
+                        </button>
+                      ))}
+                    </div>
+                    <button 
+                      onClick={handlePrint}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase hover:bg-slate-800 transition-all shadow-sm"
+                    >
+                      <Printer size={14} />
+                      <span>Imprimer</span>
+                    </button>
+                  </div>
                 </div>
+
+                <AnimatePresence>
+                  {historyFilter === 'custom' && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="px-4 md:px-6 pb-4 border-b border-slate-50 flex items-center gap-3 overflow-hidden"
+                    >
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[8px] font-black text-slate-400 uppercase">Début</label>
+                        <input 
+                          type="date" 
+                          value={historyStartDate}
+                          onChange={(e) => setHistoryStartDate(e.target.value)}
+                          className="p-2 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-black uppercase outline-none"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[8px] font-black text-slate-400 uppercase">Fin</label>
+                        <input 
+                          type="date" 
+                          value={historyEndDate}
+                          onChange={(e) => setHistoryEndDate(e.target.value)}
+                          className="p-2 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-black uppercase outline-none"
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 <div className="flex-1 overflow-auto">
                   <table className="w-full text-left">
                     <thead className="bg-slate-50 text-slate-400 text-[9px] uppercase sticky top-0 z-20 border-b border-slate-100">
@@ -481,7 +608,7 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {transactions.map(t => {
+                      {filteredTransactions.map(t => {
                         const prod = products.find(p => p.id === t.productId);
                         return (
                           <tr key={t.id} className="hover:bg-slate-50 transition-colors">
@@ -587,6 +714,67 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
+
+      {/* Hidden Print-only View */}
+      <div className="hidden print:block fixed inset-0 bg-white z-[999] p-8 overflow-auto">
+        <div className="max-w-4xl mx-auto space-y-8">
+          <div className="flex justify-between items-end border-b-4 border-slate-900 pb-4">
+            <div>
+              <h1 className="text-4xl font-black uppercase tracking-tighter italic">Historique PPN</h1>
+              <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mt-1">Export Categorisé par Produit</p>
+            </div>
+            <div className="text-right text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              Généré le {new Date().toLocaleDateString('fr-FR')} à {new Date().toLocaleTimeString('fr-FR')}
+            </div>
+          </div>
+
+          <div className="space-y-12">
+            {Object.entries(transactionsByProduct).map(([prodName, prodTransactions]) => {
+              const typedTransactions = prodTransactions as Transaction[];
+              return (
+                <div key={prodName} className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-6 bg-slate-900"></div>
+                    <h2 className="text-xl font-black uppercase tracking-tight">{prodName}</h2>
+                  </div>
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b-2 border-slate-200">
+                        <th className="py-2 font-black uppercase tracking-widest text-[9px] text-slate-400">Date & Heure</th>
+                        <th className="py-2 font-black uppercase tracking-widest text-[9px] text-slate-400">Action</th>
+                        <th className="py-2 font-black uppercase tracking-widest text-[9px] text-slate-400 text-right">Quantité</th>
+                        <th className="py-2 font-black uppercase tracking-widest text-[9px] text-slate-400 text-right">Solde</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {typedTransactions.map(t => (
+                        <tr key={t.id}>
+                          <td className="py-2 font-mono">
+                            {new Date(t.timestamp).toLocaleDateString('fr-FR')} {new Date(t.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td className={`py-2 font-black uppercase tracking-tighter ${t.type === 'IN' ? 'text-blue-600' : 'text-red-600'}`}>
+                            {t.type === 'IN' ? 'Entrée' : 'Sortie'}
+                          </td>
+                          <td className="py-2 text-right font-bold underline decoration-2 underline-offset-2">
+                            {t.type === 'IN' ? '+' : '-'}{t.quantity}
+                          </td>
+                          <td className="py-2 text-right font-black">
+                            {t.currentStockAtTime}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="pt-8 border-t border-slate-100 text-[8px] font-bold text-slate-300 uppercase tracking-widest text-center">
+            Fin du rapport - PPN Manager Cloud System
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

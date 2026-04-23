@@ -15,6 +15,11 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    // System collection for connection test
+    match /system/ping {
+      allow read: if true;
+    }
+
     // Products collection
     match /products/{productId} {
       allow read: if true; // Publicly readable for the app (can be hardened with auth)
