@@ -414,7 +414,10 @@ export default function App() {
                         <option value="pcs">pièces</option>
                         <option value="L">litres</option>
                         <option value="carton">carton</option>
-                        <option value="sac">sac</option>
+                        <option value="gony">gony</option>
+                        <option value="paquet">paquet</option>
+                        <option value="bidon">bidon</option>
+                        <option value="sachet">sachet</option>
                       </select>
                     </div>
                     <button type="submit" className="w-full py-4 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-700 transition-all uppercase text-[10px] tracking-widest shadow-lg shadow-blue-100 mt-2">
