@@ -196,11 +196,20 @@ export default function App() {
       return;
     }
     
-    if (!window.confirm(`Voulez-vous vraiment effacer les ${transactions.length} entrées de l'historique ? Cette action est irréversible.`)) return;
+    if (!window.confirm(`Voulez-vous vraiment archiver l'historique ? \n\nLes ${transactions.length} entrées seront effacées, mais vos niveaux de Stock actuels sur le Dashboard seront conservés.`)) return;
     
     setIsClearingHistory(true);
     try {
-      // Chunk transactions into batches of 500 (Firestore limit)
+      // 1. Point de Restauration : Update initialStock for all products to preserve current levels
+      const productBatch = writeBatch(db);
+      inventory.forEach(item => {
+        productBatch.update(doc(db, 'products', item.id), {
+          initialStock: item.currentStock
+        });
+      });
+      await productBatch.commit();
+
+      // 2. Clear Transactions in batches
       const batchSize = 500;
       for (let i = 0; i < transactions.length; i += batchSize) {
         const batch = writeBatch(db);
@@ -210,9 +219,11 @@ export default function App() {
         });
         await batch.commit();
       }
+      
+      alert("Historique effacé avec succès. Les niveaux de stock ont été préservés.");
     } catch (e) {
       console.error("Error clearing history:", e);
-      alert("Une erreur est survenue lors de la suppression de l'historique.");
+      alert("Une erreur est survenue lors de l'opération.");
     } finally {
       setIsClearingHistory(false);
     }
