@@ -289,10 +289,10 @@ export default function App() {
             >
               {/* Header Stats */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8 shrink-0">
-                <StatBox label="Total Produits" value={products.length.toString()} />
+                <StatBox label="Catalogue" value={products.length.toString()} />
                 <StatBox 
-                  label="Toutes Entrées" 
-                  value={transactions.filter(t => t.type === 'IN').reduce((s, t) => s + t.quantity, 0).toLocaleString()} 
+                  label="Stock Restant" 
+                  value={inventory.reduce((sum, item) => sum + item.currentStock, 0).toLocaleString()} 
                   color="text-blue-600"
                 />
                 <StatBox 
@@ -300,10 +300,11 @@ export default function App() {
                   value={transactions.filter(t => t.type === 'OUT').reduce((s, t) => s + t.quantity, 0).toLocaleString()} 
                   color="text-red-500"
                 />
-                <div className="hidden md:block bg-emerald-600 p-4 rounded-xl shadow-sm text-white border border-emerald-500">
-                  <p className="text-emerald-100 text-[10px] font-black uppercase tracking-widest">Connectivité</p>
-                  <p className="text-xl font-black mt-1 uppercase tracking-tighter">Live Cloud</p>
-                </div>
+                <StatBox 
+                  label="Produits en Stock" 
+                  value={inventory.filter(item => item.currentStock > 0).length.toString()} 
+                  color="text-emerald-600"
+                />
               </div>
 
               {/* Inventory Table */}
