@@ -26,7 +26,8 @@ import {
   User,
   LogIn,
   Printer,
-  ChevronDown
+  ChevronDown,
+  Pencil
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Product, Transaction, InventoryItem, TransactionType } from './types';
@@ -72,6 +73,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'history' | 'setup'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [quickMoveProduct, setQuickMoveProduct] = useState<{ id: string, name: string, type: TransactionType, currentStock: number } | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   // Connection testing and initial sync with Firestore
   useEffect(() => {
@@ -124,6 +126,8 @@ export default function App() {
       
       return {
         ...prod,
+        totalIn,
+        totalOut,
         currentStock: prod.initialStock + totalIn - totalOut
       };
     });
@@ -219,6 +223,15 @@ export default function App() {
       await setDoc(doc(db, 'products', id), newProduct);
     } catch (e) {
       console.error("Error adding product:", e);
+    }
+  };
+
+  const updateProduct = async (id: string, name: string, unit: string) => {
+    try {
+      await setDoc(doc(db, 'products', id), { id, name, unit, initialStock: 0 }, { merge: true });
+      setEditingProduct(null);
+    } catch (e) {
+      console.error("Error updating product:", e);
     }
   };
 
@@ -352,25 +365,7 @@ export default function App() {
               exit={{ opacity: 0, y: -10 }}
               className="flex flex-col h-full overflow-hidden"
             >
-              {/* Header Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8 shrink-0">
-                <StatBox label="Catalogue" value={products.length.toString()} />
-                <StatBox 
-                  label="Stock Restant" 
-                  value={inventory.reduce((sum, item) => sum + item.currentStock, 0).toLocaleString()} 
-                  color="text-blue-600"
-                />
-                <StatBox 
-                  label="Toutes Sorties" 
-                  value={transactions.filter(t => t.type === 'OUT').reduce((s, t) => s + t.quantity, 0).toLocaleString()} 
-                  color="text-red-500"
-                />
-                <StatBox 
-                  label="Produits en Stock" 
-                  value={inventory.filter(item => item.currentStock > 0).length.toString()} 
-                  color="text-emerald-600"
-                />
-              </div>
+              {/* Header Stats removed as requested to focus on per-product view */}
 
               {/* Inventory Table */}
               <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
@@ -394,9 +389,10 @@ export default function App() {
                   <table className="w-full text-left">
                     <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase sticky top-0 z-10 border-b border-slate-100">
                       <tr>
-                        <th className="px-4 md:px-6 py-4 font-black">Article</th>
-                        <th className="px-4 md:px-6 py-4 font-black text-right">Reste</th>
-                        <th className="hidden md:table-cell px-6 py-4 font-black text-center">Statut</th>
+                        <th className="px-4 md:px-6 py-4 font-black text-left">Article</th>
+                        <th className="px-4 md:px-6 py-4 font-black text-right text-blue-500">Entrées</th>
+                        <th className="px-4 md:px-6 py-4 font-black text-right text-red-400">Sorties</th>
+                        <th className="px-4 md:px-6 py-4 font-black text-right">Stock</th>
                         <th className="px-4 md:px-6 py-4 font-black text-right">Actions</th>
                       </tr>
                     </thead>
@@ -404,22 +400,23 @@ export default function App() {
                       {filteredInventory.map((item) => (
                         <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
                           <td className="px-4 md:px-6 py-4">
-                            <span className="font-black text-slate-800 text-sm md:text-lg tracking-tight uppercase leading-tight">{item.name}</span>
-                            <span className="block text-[9px] text-slate-400 font-bold uppercase">{item.unit}</span>
+                            <span className="font-black text-slate-800 text-sm md:text-base tracking-tight uppercase leading-tight">{item.name}</span>
+                            <span className="block text-[8px] text-slate-400 font-bold uppercase">{item.unit}</span>
                           </td>
                           <td className="px-4 md:px-6 py-4 text-right">
-                            <span className={`text-xl md:text-2xl font-black tracking-tighter ${item.currentStock < 10 ? 'text-red-500' : 'text-slate-900'}`}>
-                              {item.currentStock.toLocaleString()}
+                             <span className="text-xs md:text-sm font-black text-blue-600 tabular-nums">
+                              {item.totalIn.toLocaleString()}
                             </span>
                           </td>
-                          <td className="hidden md:table-cell px-6 py-4">
-                            <div className="flex items-center justify-center gap-1.5">
-                              {item.currentStock < 10 ? (
-                                <div className="px-2 py-1 bg-red-100 text-red-600 rounded text-[9px] font-black uppercase ring-1 ring-red-200">Avertissement</div>
-                              ) : (
-                                <div className="px-2 py-1 bg-emerald-100 text-emerald-600 rounded text-[9px] font-black uppercase ring-1 ring-emerald-200">Sain</div>
-                              )}
-                            </div>
+                          <td className="px-4 md:px-6 py-4 text-right">
+                             <span className="text-xs md:text-sm font-black text-red-500 tabular-nums">
+                              {item.totalOut.toLocaleString()}
+                            </span>
+                          </td>
+                          <td className="px-4 md:px-6 py-4 text-right">
+                            <span className={`text-base md:text-xl font-black tracking-tighter tabular-nums ${item.currentStock < 10 ? 'text-red-500' : 'text-slate-900'}`}>
+                              {item.currentStock.toLocaleString()}
+                            </span>
                           </td>
                           <td className="px-4 md:px-6 py-4 text-right">
                             <div className="flex items-center justify-end gap-1.5 md:gap-2">
@@ -434,6 +431,21 @@ export default function App() {
                                 className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center bg-red-50 text-red-500 rounded-lg md:rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
                               >
                                 <Plus size={18} strokeWidth={3} className="rotate-45" />
+                              </button>
+                              <div className="w-[1px] h-4 bg-slate-100 mx-1 hidden md:block"></div>
+                              <button 
+                                onClick={() => setEditingProduct(item)}
+                                className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                title="Modifier le produit"
+                              >
+                                <Pencil size={16} />
+                              </button>
+                              <button 
+                                onClick={() => deleteProduct(item.id)}
+                                className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                title="Supprimer le produit"
+                              >
+                                <Trash2 size={16} />
                               </button>
                             </div>
                           </td>
@@ -509,12 +521,22 @@ export default function App() {
                             <div className="text-[9px] font-bold text-slate-400 uppercase">Unit: {p.unit}</div>
                           </div>
                         </div>
-                        <button 
-                          onClick={() => deleteProduct(p.id)}
-                          className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => setEditingProduct(p)}
+                            className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                            title="Modifier"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button 
+                            onClick={() => deleteProduct(p.id)}
+                            className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                            title="Supprimer"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -604,7 +626,7 @@ export default function App() {
                         <th className="px-4 md:px-6 py-3 font-black">Date / Heure</th>
                         <th className="px-4 md:px-6 py-3 font-black">Produit</th>
                         <th className="px-4 md:px-6 py-3 font-black text-right">Qty</th>
-                        <th className="px-4 md:px-6 py-3 font-black text-right bg-slate-100/50">Restant</th>
+                        <th className="px-4 md:px-6 py-3 font-black text-right bg-slate-100/50">Stock</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -713,6 +735,84 @@ export default function App() {
             </div>
           )}
         </AnimatePresence>
+
+        {/* Edit Product Modal */}
+        <AnimatePresence>
+          {editingProduct && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setEditingProduct(null)}
+                className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 30 }}
+                className="relative w-full max-w-sm bg-white rounded-[2.5rem] p-6 md:p-10 shadow-2xl border-t-8 border-blue-600"
+              >
+                <div className="space-y-6">
+                  <div className="text-center">
+                    <h3 className="font-black text-2xl uppercase tracking-tighter text-slate-900 leading-tight">Modifier Produit</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Mise à jour du catalogue</p>
+                  </div>
+
+                  <form className="space-y-4" onSubmit={async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.currentTarget);
+                    await updateProduct(editingProduct.id, formData.get('name') as string, formData.get('unit') as string);
+                  }}>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase text-slate-500">Nom du produit</label>
+                      <input 
+                        name="name"
+                        type="text" 
+                        required 
+                        defaultValue={editingProduct.name}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-500/20 transition-all placeholder:text-slate-300"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase text-slate-500">Unité</label>
+                      <select 
+                        name="unit" 
+                        required 
+                        defaultValue={editingProduct.unit}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none cursor-pointer"
+                      >
+                        <option value="kg">kg</option>
+                        <option value="pcs">pièces</option>
+                        <option value="L">litres</option>
+                        <option value="carton">carton</option>
+                        <option value="gony">gony</option>
+                        <option value="paquet">paquet</option>
+                        <option value="bidon">bidon</option>
+                        <option value="sachet">sachet</option>
+                      </select>
+                    </div>
+                    <div className="pt-4 space-y-3">
+                      <button 
+                        type="submit" 
+                        className="w-full py-4 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-700 transition-all uppercase text-[10px] tracking-widest shadow-lg shadow-blue-100"
+                      >
+                        Enregistrer les modifications
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setEditingProduct(null)}
+                        className="w-full py-3 text-[10px] font-black text-slate-300 hover:text-slate-500 uppercase tracking-widest transition-colors"
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </main>
 
       {/* Hidden Print-only View */}
@@ -743,7 +843,7 @@ export default function App() {
                         <th className="py-2 font-black uppercase tracking-widest text-[9px] text-slate-400">Date & Heure</th>
                         <th className="py-2 font-black uppercase tracking-widest text-[9px] text-slate-400">Action</th>
                         <th className="py-2 font-black uppercase tracking-widest text-[9px] text-slate-400 text-right">Quantité</th>
-                        <th className="py-2 font-black uppercase tracking-widest text-[9px] text-slate-400 text-right">Solde</th>
+                        <th className="py-2 font-black uppercase tracking-widest text-[9px] text-slate-400 text-right">Stock</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">

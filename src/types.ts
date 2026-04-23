@@ -23,4 +23,6 @@ export interface Transaction {
 
 export interface InventoryItem extends Product {
   currentStock: number;
+  totalIn: number;
+  totalOut: number;
 }
